@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HelixHash — Local Hashing Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <p class="eyebrow">Step 1 · Privacy prototype</p>
+        <h1>HelixHash</h1>
+        <p class="subtitle">Parse and anonymize a FASTA file locally in your browser.</p>
+      </header>
+
+      <section class="card">
+        <label for="fasta-file" class="drop-zone">
+          <span class="drop-title">Choose a FASTA file</span>
+          <span class="drop-help">.fa, .fasta, or .txt</span>
+          <input id="fasta-file" type="file" accept=".fa,.fasta,.fna,.txt,text/plain" />
+        </label>
+        <p id="file-name" class="muted">No file selected.</p>
+        <button id="hash-button" type="button" disabled>Hash locally</button>
+      </section>
+
+      <section class="card result-card" aria-live="polite">
+        <div class="status-row">
+          <span class="status-dot"></span>
+          <strong id="status">Waiting for a file</strong>
+        </div>
+        <p id="privacy-note" class="muted">Nothing has been uploaded or transmitted.</p>
+        <div id="results" hidden>
+          <dl class="summary">
+            <div><dt>Sequence length</dt><dd id="sequence-length">—</dd></div>
+            <div><dt>Chunks</dt><dd id="chunk-count">—</dd></div>
+          </dl>
+          <h2>Anonymous SHA-256 codes</h2>
+          <ol id="hash-list" class="hash-list"></ol>
+        </div>
+      </section>
+    </main>
+    <script src="app.js" defer></script>
+  </body>
+</html>
