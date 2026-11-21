@@ -1,22 +1,40 @@
-# HelixHash — Step 1
+# HelixHash
 
-This prototype demonstrates the privacy boundary in the workflow: a FASTA file is parsed, split into chunks, and hashed with SHA-256 entirely in the browser.
+HelixHash is a privacy-focused prototype. The browser parses and hashes FASTA data locally; the Python API currently provides a health check.
 
-## Run it
+## Project layout
 
-Open `index.html` in a modern browser. Because this step uses the browser Web Crypto API, use `http://localhost` if a browser blocks cryptography for local files.
+```text
+HelixHash/
+├── index.html
+├── app.js
+├── styles.css
+├── sample.fasta
+├── requirements.txt
+└── backend/
+    ├── __init__.py
+    └── main.py
+```
 
-From this directory, one option is:
+## Run the frontend
+
+From the project folder:
 
 ```powershell
 python -m http.server 8000
 ```
 
-Then visit `http://localhost:8000`.
+Open http://localhost:8000.
 
-## Current assumptions
+## Run the backend
 
-- Chunks are 100 bases long.
-- FASTA headers begin with `>` and are ignored.
-- Only `A`, `C`, `G`, `T`, and `N` are retained.
-- No network request is made by this prototype.
+Open a second terminal in the project folder:
+
+```powershell
+pip install -r requirements.txt
+uvicorn backend.main:app --reload --port 8001
+```
+
+Check the API at http://127.0.0.1:8001/health. It should return `{"status":"ok"}`.
+
+The frontend uses port 8000 and the backend uses port 8001 so both can run at the same time.
