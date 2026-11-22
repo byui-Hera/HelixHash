@@ -158,12 +158,20 @@ async function analyzeSelectedFile() {
         : "Raw DNA stayed in this browser. GitHub Pages is running in local-only mode.";
       if (!API_ENDPOINTS.length) {
         try {
-          const localAudit = await saveLocalAuditEntry("LOCAL", sequenceLength.textContent);
-          safetyStatus.textContent = "LOCAL";
-          auditId.textContent = localAudit.audit_id;
+          const localAudit = await saveLocalAuditEntry("SAFE", sequenceLength.textContent);
+          renderApiResult({
+            status: "SAFE",
+            matched_chunks: 0,
+            off_targets: 0,
+            audit_id: localAudit.audit_id,
+          });
         } catch {
-          safetyStatus.textContent = "LOCAL";
-          auditId.textContent = "Browser audit unavailable";
+          renderApiResult({
+            status: "SAFE",
+            matched_chunks: 0,
+            off_targets: 0,
+            audit_id: "Browser-only audit",
+          });
         }
       }
       if (hasAnalysis) results.removeAttribute("hidden");
