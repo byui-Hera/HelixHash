@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from uuid import uuid4
 
-from .database import find_matches, initialize_database, save_audit
+from .database import find_matches, get_audit_log, initialize_database, save_audit, verify_audit_log
 
 app = FastAPI(title="HelixHash API")
 
@@ -53,11 +53,22 @@ def receive_hashes(request: HashRequest) -> dict[str, int | str]:
     audit_id = str(uuid4())
     result_status = "WARNING" if matches else "SAFE"
     AUDIT_LOG.append({"audit_id": audit_id, "status": result_status})
-    save_audit(audit_id, result_status, len(matches), 0)
+    chain_record = save_audit(audit_id, result_status, len(matches), 0)
     return {
         "status": result_status,
         "received": len(request.hashes),
         "matched_chunks": len(matches),
         "off_targets": 0,
         "audit_id": audit_id,
+        "entry_hash": chain_record["entry_hash"],
     }
+
+
+@app.get("/audit-log")
+def audit_log() -> list[dict]:
+    return get_audit_log()
+
+
+@app.get("/audit-log/verify")
+def audit_log_verify() -> dict[str, object]:
+    return verify_audit_log()
