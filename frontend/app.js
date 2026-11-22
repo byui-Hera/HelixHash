@@ -69,6 +69,7 @@ function setSelectedFile(file) {
   decision.querySelector(".decision-check").textContent = "✓";
 
   if (selectedFile) {
+    results.removeAttribute("hidden");
     openAnalysisDashboard();
     analyzeSelectedFile();
   }
@@ -111,6 +112,7 @@ function openAnalysisDashboard() {
 async function analyzeSelectedFile() {
   if (!selectedFile) return;
 
+  openAnalysisDashboard();
   const run = analysisRun;
   const file = selectedFile;
   hashButton.disabled = true;

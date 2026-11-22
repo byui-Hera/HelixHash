@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="HelixHash privacy-first FASTA screening prototype" />
+    <title>HelixHash | Privacy-first sequence screening</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <nav class="nav" aria-label="Primary navigation">
+        <a class="brand" href="#top"><span class="brand-mark">H</span><span>HelixHash</span></a>
+        <div class="nav-links">
+          <a href="#screen">Screen DNA</a>
+          <a href="#analysis-dashboard">Audit Log</a>
+          <a href="#privacy-architecture">How It Works</a>
+        </div>
+        <span class="nav-pill"><span class="pulse"></span> Local-first protection</span>
+      </nav>
+
+      <main id="top">
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span> Privacy-first sequence screening</p>
+            <h1>Your sequence.<br /><em>Your control.</em></h1>
+            <p class="subtitle">Anonymize FASTA files in your browser before anything leaves your device.</p>
+            <div class="hero-proof"><span class="check">✓</span> Raw DNA never leaves this browser</div>
+          </div>
+          <div class="hero-orbit" aria-hidden="true">
+            <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+            <div class="orbit-core">⌁</div>
+            <span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span><span class="orbit-dot dot-three"></span>
+          </div>
+        </section>
+
+        <section id="screen" class="workspace-grid">
+          <section class="card upload-card">
+            <div class="section-heading"><div><span class="step-label">01 / START</span><h2>Choose a sequence</h2></div><span class="heading-icon">↗</span></div>
+            <p class="card-intro">Select a FASTA file to begin a private, local analysis.</p>
+            <label for="fasta-file" class="drop-zone">
+              <span class="upload-icon">↑</span>
+              <span class="drop-title">Drop your FASTA file here</span>
+              <span class="drop-help">or click to browse · .fa, .fasta, .fna, .txt</span>
+              <input id="fasta-file" type="file" accept=".fa,.fasta,.fna,.txt,text/plain" />
+            </label>
+            <p id="file-name" class="file-name">No file selected.</p>
+            <div class="session-actions">
+              <button id="sample-button" class="secondary-button" type="button">Load Sample FASTA</button>
+              <button id="reset-button" class="text-button" type="button">Reset Session</button>
+            </div>
+            <button id="hash-button" type="button" disabled><span>Hash locally</span><span>→</span></button>
+          </section>
+
+          <section id="analysis-dashboard" class="card result-card" aria-live="polite" tabindex="-1">
+            <div class="section-heading"><div><span class="step-label">02 / RESULTS</span><h2>Analysis dashboard</h2></div><span class="secure-badge">ENCRYPTED FLOW</span></div>
+            <div class="status-row"><span class="status-dot"></span><strong id="status">Waiting for a file</strong></div>
+            <p id="privacy-note" class="muted">Nothing has been uploaded or transmitted.</p>
+            <div id="results" hidden>
+              <div class="decision"><div><span class="decision-label">Safety status</span><strong id="safety-status">—</strong></div><span class="decision-check">✓</span></div>
+              <dl class="summary">
+                <div><dt>Sequence length</dt><dd id="sequence-length">—</dd></div>
+                <div><dt>Chunks</dt><dd id="chunk-count">—</dd></div>
+                <div><dt>Matched chunks</dt><dd id="matched-chunks">—</dd></div>
+                <div><dt>Off-targets</dt><dd id="off-targets">—</dd></div>
+              </dl>
+              <p class="audit-line"><span>Immutable audit record</span><code id="audit-id">—</code></p>
+              <details class="hash-details"><summary>View anonymous SHA-256 codes</summary><ol id="hash-list" class="hash-list"></ol></details>
+              <div class="audit-tools">
+                <button id="check-log-button" class="secondary-button" type="button">Check audit log</button>
+                <span id="chain-status" class="chain-status">Chain verification has not run.</span>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="privacy-architecture" class="privacy-strip"><span class="shield">◇</span><div><strong>Privacy is the default.</strong><span>DNA is parsed and hashed locally. Only anonymous codes travel to the risk-check API.</span></div><span class="lock-word">LOCAL → HASH → CHECK</span></section>
+      </main>
+      <footer><span>HELIXHASH / PROTOTYPE</span><span>Built for responsible data handling</span></footer>
+    </div>
+    <script src="app.js?v=10" defer></script>
+  </body>
+</html>
