@@ -22,6 +22,7 @@ const sampleButton = document.querySelector("#sample-button");
 const resetButton = document.querySelector("#reset-button");
 const decision = document.querySelector(".decision");
 const STORAGE_KEY = "helixhash:last-result";
+const LOCAL_AUDIT_KEY = "helixhash:local-audit-chain";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const API_ENDPOINTS = LOCAL_HOSTS.has(window.location.hostname)
   ? [
@@ -154,7 +155,17 @@ async function analyzeSelectedFile() {
         : "Local analysis complete — local-only mode";
       privacyNote.textContent = API_ENDPOINTS.length
         ? "Raw DNA stayed in this browser. Start the backend on port 8001 to run the anonymous risk check."
-        : "Raw DNA stayed in this browser. Risk checks require the optional local API; GitHub Pages supports local analysis only.";
+        : "Raw DNA stayed in this browser. GitHub Pages is running in local-only mode.";
+      if (!API_ENDPOINTS.length) {
+        try {
+          const localAudit = await saveLocalAuditEntry("LOCAL", sequenceLength.textContent);
+          safetyStatus.textContent = "LOCAL";
+          auditId.textContent = localAudit.audit_id;
+        } catch {
+          safetyStatus.textContent = "LOCAL";
+          auditId.textContent = "Browser audit unavailable";
+        }
+      }
       if (hasAnalysis) results.removeAttribute("hidden");
     } else {
       status.textContent = error.message;
@@ -214,7 +225,12 @@ async function checkAuditLog() {
 
   try {
     if (!API_ENDPOINTS.length) {
-      throw new Error("The audit API is only available when running locally.");
+      const localResult = await verifyLocalAuditLog();
+      chainStatus.textContent = localResult.valid
+        ? `Local chain intact · ${localResult.checked} entr${localResult.checked === 1 ? "y" : "ies"} checked`
+        : `Local chain broken at entry ${localResult.broken_at}`;
+      chainStatus.className = `chain-status ${localResult.valid ? "valid" : "invalid"}`;
+      return;
     }
     let result;
     for (const endpoint of API_ENDPOINTS) {
@@ -232,13 +248,43 @@ async function checkAuditLog() {
       : `Chain broken at entry ${result.broken_at}`;
     chainStatus.className = `chain-status ${result.valid ? "valid" : "invalid"}`;
   } catch {
-    chainStatus.textContent = API_ENDPOINTS.length
-      ? "Audit API unavailable."
-      : "Audit checks require the local API.";
+    chainStatus.textContent = "Audit verification is unavailable.";
     chainStatus.className = "chain-status invalid";
   } finally {
     checkLogButton.disabled = false;
   }
+}
+
+async function makeAuditHash(previousHash, auditId, statusValue, sequenceLengthValue, createdAt) {
+  const payload = [previousHash, auditId, statusValue, sequenceLengthValue, "0", createdAt].join("|");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function saveLocalAuditEntry(statusValue, sequenceLengthValue) {
+  const entries = JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
+  const previousHash = entries.at(-1)?.entry_hash || "GENESIS";
+  const auditId = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const createdAt = new Date().toISOString();
+  const entryHash = await makeAuditHash(previousHash, auditId, statusValue, sequenceLengthValue, createdAt);
+  const entry = { audit_id: auditId, status: statusValue, sequence_length: sequenceLengthValue, created_at: createdAt, previous_hash: previousHash, entry_hash: entryHash };
+  entries.push(entry);
+  localStorage.setItem(LOCAL_AUDIT_KEY, JSON.stringify(entries));
+  return entry;
+}
+
+async function verifyLocalAuditLog() {
+  const entries = JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
+  let previousHash = "GENESIS";
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    const expectedHash = await makeAuditHash(previousHash, entry.audit_id, entry.status, entry.sequence_length, entry.created_at);
+    if (entry.previous_hash !== previousHash || entry.entry_hash !== expectedHash) {
+      return { valid: false, checked: entries.length, broken_at: index + 1 };
+    }
+    previousHash = entry.entry_hash;
+  }
+  return { valid: true, checked: entries.length, broken_at: null };
 }
 
 function splitIntoChunks(sequence, size) { // divides DNA into 100-base sections
