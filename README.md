@@ -19,7 +19,7 @@ GitHub Pages should use the `frontend/` folder as its publishing source. Local h
 
 ## Features
 
-Local FASTA parsing, SHA-256 hashing, sample loading, SAFE/WARNING results, session reset, responsive layout, and a tamper-evident audit log.
+Local FASTA parsing, SHA-256 hashing, sample loading, SAFE/WARNING results, session reset, responsive layout, a tamper-evident audit log, and a local-only constellation visualization. When the optional backend is unavailable, the dashboard still shows a local SAFE result and verifies the browser audit chain.
 
 ## How the audit hash chain works
 

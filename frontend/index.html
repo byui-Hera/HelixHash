@@ -19,6 +19,7 @@
           <a href="#screen">Screen DNA</a>
           <a href="#analysis-dashboard">Audit Log</a>
           <a href="#privacy-architecture">How It Works</a>
+          <a href="#signal-lab">Constellation Lab</a>
         </div>
         <span class="nav-pill"><span class="pulse"></span> Local-first protection</span>
       </nav>
@@ -79,9 +80,28 @@
         </section>
 
         <section id="privacy-architecture" class="privacy-strip"><span class="shield">◇</span><div><strong>Privacy is the default.</strong><span>DNA is parsed and hashed locally. Only anonymous codes travel to the risk-check API.</span></div><span class="lock-word">LOCAL → HASH → CHECK</span></section>
+
+        <section id="signal-lab" class="signal-lab" aria-labelledby="signal-lab-title">
+          <div class="lab-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span> A private visual instrument</p>
+            <h2 id="signal-lab-title">Constellation <em>Lab</em></h2>
+            <p>Turn the anonymous SHA-256 trail into a one-of-a-kind constellation. Every point is derived from a hash, never from the readable sequence.</p>
+            <div class="lab-controls">
+              <button id="constellation-button" class="secondary-button" type="button">Generate constellation <span>✦</span></button>
+              <span id="constellation-status" class="chain-status">Waiting for a local analysis.</span>
+            </div>
+          </div>
+          <div class="constellation-card">
+            <div class="constellation-head"><span>ANONYMOUS SIGNAL MAP</span><span id="constellation-count">0 POINTS</span></div>
+            <div id="constellation" class="constellation" role="img" aria-label="An empty anonymous hash constellation">
+              <span class="constellation-empty">Load a FASTA file<br />to reveal its shape</span>
+            </div>
+            <p id="constellation-detail" class="constellation-detail">No readable DNA is used here.</p>
+          </div>
+        </section>
       </main>
       <footer><span>HELIXHASH / PROTOTYPE</span><span>Built for responsible data handling</span></footer>
     </div>
-    <script src="app.js?v=11" defer></script>
+    <script src="app.js?v=12" defer></script>
   </body>
 </html>

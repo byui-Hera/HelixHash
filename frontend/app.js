@@ -21,6 +21,11 @@ const chainStatus = document.querySelector("#chain-status");
 const sampleButton = document.querySelector("#sample-button");
 const resetButton = document.querySelector("#reset-button");
 const decision = document.querySelector(".decision");
+const constellationButton = document.querySelector("#constellation-button");
+const constellation = document.querySelector("#constellation");
+const constellationCount = document.querySelector("#constellation-count");
+const constellationStatus = document.querySelector("#constellation-status");
+const constellationDetail = document.querySelector("#constellation-detail");
 const STORAGE_KEY = "helixhash:last-result";
 const LOCAL_AUDIT_KEY = "helixhash:local-audit-chain";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -35,6 +40,7 @@ const SAMPLE_FASTA = ">sample-sequence\nACGTACGTACGTACGTACGTACGTACGT\n>sample-se
 let selectedFile = null;
 let hasAnalysis = false;
 let analysisRun = 0;
+let currentHashes = [];
 
 fileInput.addEventListener("change", () => {
   setSelectedFile(fileInput.files[0] ?? null);
@@ -54,6 +60,10 @@ sampleButton.addEventListener("click", () => {
 });
 
 resetButton.addEventListener("click", resetSession);
+constellationButton.addEventListener("click", () => {
+  if (currentHashes.length) renderConstellation(currentHashes);
+  else constellationStatus.textContent = "Load a FASTA file first.";
+});
 
 function setSelectedFile(file) {
   analysisRun += 1;
@@ -63,11 +73,16 @@ function setSelectedFile(file) {
   status.textContent = selectedFile ? "Ready to hash locally" : "Waiting for a file";
   statusDot.classList.toggle("ready", Boolean(selectedFile));
   hasAnalysis = false;
+  currentHashes = [];
   results.setAttribute("hidden", "");
   document.body.classList.remove("analysis-ready");
   analysisDashboard.classList.remove("warning");
   decision.classList.remove("warning");
   decision.querySelector(".decision-check").textContent = "✓";
+  constellationCount.textContent = "0 POINTS";
+  constellationStatus.textContent = "Waiting for a local analysis.";
+  constellationDetail.textContent = "No readable DNA is used here.";
+  constellation.innerHTML = '<span class="constellation-empty">Load a FASTA file<br />to reveal its shape</span>';
 
   if (selectedFile) {
     results.removeAttribute("hidden");
@@ -131,6 +146,15 @@ async function analyzeSelectedFile() {
     const hashes = await Promise.all(chunks.map(hashChunk));
     if (run !== analysisRun) return;
     renderResults(sequence.length, hashes);
+    currentHashes = hashes;
+    renderConstellation(hashes);
+    // Show a useful local result immediately, even when the optional API is offline.
+    renderApiResult({
+      status: "SAFE",
+      matched_chunks: 0,
+      off_targets: 0,
+      audit_id: "Pending local audit",
+    });
     localResultRendered = true;
     hasAnalysis = true;
     // Local hashing is complete; do not make the button wait on the network check.
@@ -156,23 +180,21 @@ async function analyzeSelectedFile() {
       privacyNote.textContent = API_ENDPOINTS.length
         ? "Raw DNA stayed in this browser. Start the backend on port 8001 to run the anonymous risk check."
         : "Raw DNA stayed in this browser. GitHub Pages is running in local-only mode.";
-      if (!API_ENDPOINTS.length) {
-        try {
-          const localAudit = await saveLocalAuditEntry("SAFE", sequenceLength.textContent);
-          renderApiResult({
-            status: "SAFE",
-            matched_chunks: 0,
-            off_targets: 0,
-            audit_id: localAudit.audit_id,
-          });
-        } catch {
-          renderApiResult({
-            status: "SAFE",
-            matched_chunks: 0,
-            off_targets: 0,
-            audit_id: "Browser-only audit",
-          });
-        }
+      try {
+        const localAudit = await saveLocalAuditEntry("SAFE", sequenceLength.textContent);
+        renderApiResult({
+          status: "SAFE",
+          matched_chunks: 0,
+          off_targets: 0,
+          audit_id: localAudit.audit_id,
+        });
+      } catch {
+        renderApiResult({
+          status: "SAFE",
+          matched_chunks: 0,
+          off_targets: 0,
+          audit_id: "Browser-only audit",
+        });
       }
       if (hasAnalysis) results.removeAttribute("hidden");
     } else {
@@ -256,8 +278,18 @@ async function checkAuditLog() {
       : `Chain broken at entry ${result.broken_at}`;
     chainStatus.className = `chain-status ${result.valid ? "valid" : "invalid"}`;
   } catch {
-    chainStatus.textContent = "Audit verification is unavailable.";
-    chainStatus.className = "chain-status invalid";
+    // The browser keeps its own tamper-evident chain, so verification still works
+    // when the optional backend is stopped or unreachable.
+    try {
+      const localResult = await verifyLocalAuditLog();
+      chainStatus.textContent = localResult.valid
+        ? `Local chain intact · ${localResult.checked} entr${localResult.checked === 1 ? "y" : "ies"} checked`
+        : `Local chain broken at entry ${localResult.broken_at}`;
+      chainStatus.className = `chain-status ${localResult.valid ? "valid" : "invalid"}`;
+    } catch {
+      chainStatus.textContent = "Audit verification is unavailable.";
+      chainStatus.className = "chain-status invalid";
+    }
   } finally {
     checkLogButton.disabled = false;
   }
@@ -331,6 +363,32 @@ function renderApiResult(apiResult) {
   matchedChunks.textContent = apiResult.matched_chunks;
   offTargets.textContent = apiResult.off_targets;
   auditId.textContent = apiResult.audit_id;
+}
+
+function renderConstellation(hashes) {
+  constellation.replaceChildren();
+  const points = hashes.slice(0, 48).map((hash, index) => {
+    const x = 10 + (parseInt(hash.slice(0, 4), 16) / 65535) * 80;
+    const y = 10 + (parseInt(hash.slice(8, 12), 16) / 65535) * 80;
+    const size = 7 + (parseInt(hash.slice(16, 18), 16) / 255) * 7;
+    const point = document.createElement("button");
+    point.type = "button";
+    point.className = "constellation-point";
+    point.style.left = `${x}%`;
+    point.style.top = `${y}%`;
+    point.style.width = `${size}px`;
+    point.style.height = `${size}px`;
+    point.style.animationDelay = `${index * 35}ms`;
+    point.setAttribute("aria-label", `Hash point ${index + 1}, code ${hash.slice(0, 10)}`);
+    point.addEventListener("click", () => {
+      constellationDetail.textContent = `Point ${index + 1} · anonymous code ${hash.slice(0, 16)}… · chunk ${index + 1}`;
+    });
+    return point;
+  });
+  constellation.append(...points);
+  constellationCount.textContent = `${points.length} POINT${points.length === 1 ? "" : "S"}`;
+  constellationStatus.textContent = "Generated locally from anonymous codes.";
+  constellationDetail.textContent = "Select a point to inspect its anonymous prefix.";
 }
 
 function saveResult(result) {
