@@ -35,7 +35,7 @@ const API_ENDPOINTS = LOCAL_HOSTS.has(window.location.hostname)
       "http://localhost:8001/hashes",
     ]
   : [];
-const SAMPLE_FASTA = ">sample-sequence\nACGTACGTACGTACGTACGTACGTACGT\n>sample-sequence-2\nTACGATCGGCTAACGTATCGATGCCTA\n";
+const SAMPLE_FASTA = ">sample-sequence\nACGTACGTACGTACGTACGTACGTACGT\n>sample-sequence-2\nTACGATCGGCTAACGTATCGATGCCTA\n>sample-sequence-3\nGGCATATGCCGTAACCTTAGGCTAACG\n";
 
 let selectedFile = null;
 let hasAnalysis = false;
