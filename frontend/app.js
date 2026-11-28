@@ -17,6 +17,7 @@ const hashList = document.querySelector("#hash-list");
 const statusDot = document.querySelector(".status-dot");
 const analysisDashboard = document.querySelector("#analysis-dashboard");
 const checkLogButton = document.querySelector("#check-log-button");
+const breakLogButton = document.querySelector("#break-log-button");
 const chainStatus = document.querySelector("#chain-status");
 const sampleButton = document.querySelector("#sample-button");
 const resetButton = document.querySelector("#reset-button");
@@ -26,6 +27,7 @@ const constellation = document.querySelector("#constellation");
 const constellationCount = document.querySelector("#constellation-count");
 const constellationStatus = document.querySelector("#constellation-status");
 const constellationDetail = document.querySelector("#constellation-detail");
+const constellationChainBadge = document.querySelector("#constellation-chain-badge");
 const STORAGE_KEY = "helixhash:last-result";
 const LOCAL_AUDIT_KEY = "helixhash:local-audit-chain";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -41,6 +43,7 @@ let selectedFile = null;
 let hasAnalysis = false;
 let analysisRun = 0;
 let currentHashes = [];
+let chainState = "unknown";
 
 fileInput.addEventListener("change", () => {
   setSelectedFile(fileInput.files[0] ?? null);
@@ -110,6 +113,7 @@ function resetSession() {
   decision.querySelector(".decision-check").textContent = "✓";
   chainStatus.textContent = "Chain verification has not run.";
   chainStatus.className = "chain-status";
+  setChainState("unknown");
 }
 
 hashButton.addEventListener("click", () => {
@@ -117,6 +121,7 @@ hashButton.addEventListener("click", () => {
   analyzeSelectedFile();
 });
 checkLogButton.addEventListener("click", checkAuditLog);
+breakLogButton.addEventListener("click", breakAuditLogDemo);
 
 function openAnalysisDashboard() {
   document.body.classList.add("dashboard-open");
@@ -170,6 +175,7 @@ async function analyzeSelectedFile() {
       hashes,
       apiResult,
     });
+    await checkAuditLog();
     privacyNote.textContent = "Raw DNA stayed in this browser; only SHA-256 hashes were transmitted.";
   } catch (error) {
     if (run !== analysisRun) return;
@@ -196,6 +202,7 @@ async function analyzeSelectedFile() {
           audit_id: "Browser-only audit",
         });
       }
+      await checkAuditLog();
       if (hasAnalysis) results.removeAttribute("hidden");
     } else {
       status.textContent = error.message;
@@ -254,45 +261,91 @@ async function checkAuditLog() {
   chainStatus.className = "chain-status pending";
 
   try {
-    if (!API_ENDPOINTS.length) {
-      const localResult = await verifyLocalAuditLog();
-      chainStatus.textContent = localResult.valid
-        ? `Local chain intact · ${localResult.checked} entr${localResult.checked === 1 ? "y" : "ies"} checked`
-        : `Local chain broken at entry ${localResult.broken_at}`;
-      chainStatus.className = `chain-status ${localResult.valid ? "valid" : "invalid"}`;
-      return;
-    }
-    let result;
-    for (const endpoint of API_ENDPOINTS) {
-      try {
-        const response = await fetch(endpoint.replace("/hashes", "/audit-log/verify"));
-        if (!response.ok) throw new Error("The audit log could not be checked.");
-        result = await response.json();
-        break;
-      } catch (error) {
-        if (endpoint === API_ENDPOINTS.at(-1)) throw error;
-      }
-    }
-    chainStatus.textContent = result.valid
-      ? `Chain intact · ${result.checked} entr${result.checked === 1 ? "y" : "ies"} checked`
-      : `Chain broken at entry ${result.broken_at}`;
-    chainStatus.className = `chain-status ${result.valid ? "valid" : "invalid"}`;
+    const verification = await verifyAuditChain();
+    renderChainVerification(verification.result, verification.local);
   } catch {
-    // The browser keeps its own tamper-evident chain, so verification still works
-    // when the optional backend is stopped or unreachable.
-    try {
-      const localResult = await verifyLocalAuditLog();
-      chainStatus.textContent = localResult.valid
-        ? `Local chain intact · ${localResult.checked} entr${localResult.checked === 1 ? "y" : "ies"} checked`
-        : `Local chain broken at entry ${localResult.broken_at}`;
-      chainStatus.className = `chain-status ${localResult.valid ? "valid" : "invalid"}`;
-    } catch {
-      chainStatus.textContent = "Audit verification is unavailable.";
-      chainStatus.className = "chain-status invalid";
-    }
+    chainStatus.textContent = "Audit verification is unavailable.";
+    chainStatus.className = "chain-status invalid";
+    setChainState("unknown");
   } finally {
     checkLogButton.disabled = false;
   }
+}
+
+async function verifyAuditChain() {
+  if (API_ENDPOINTS.length) {
+    try {
+      const result = await requestFromApi("/audit-log/verify");
+      return { result, local: false };
+    } catch {
+      // The local chain is the intentional offline fallback.
+    }
+  }
+  return { result: await verifyLocalAuditLog(), local: true };
+}
+
+async function requestFromApi(path, options = {}) {
+  let lastError;
+  for (const endpoint of API_ENDPOINTS) {
+    try {
+      const response = await fetch(endpoint.replace("/hashes", path), options);
+      if (!response.ok) throw new Error(`API returned ${response.status}.`);
+      return response.json();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error("The API is unavailable.");
+}
+
+function setChainState(state) {
+  chainState = state;
+  constellationChainBadge.className = `chain-badge ${state}`;
+  constellationChainBadge.textContent = state === "valid" ? "Chain OK" : state === "invalid" ? "Change Found" : "Chain unchecked";
+}
+
+function renderChainVerification(result, local) {
+  const label = local ? "Local chain" : "Chain";
+  chainStatus.textContent = result.valid
+    ? `${label} intact · ${result.checked} entr${result.checked === 1 ? "y" : "ies"} checked`
+    : `${label} broken at entry ${result.broken_at}`;
+  chainStatus.className = `chain-status ${result.valid ? "valid" : "invalid"}`;
+  setChainState(result.valid ? "valid" : "invalid");
+}
+
+async function breakAuditLogDemo() {
+  breakLogButton.disabled = true;
+  breakLogButton.textContent = "Breaking…";
+  try {
+    const changed = await breakSavedRecord();
+    if (!changed) throw new Error("Run an analysis first so there is a saved record to test.");
+    const verification = await verifyAuditChain();
+    renderChainVerification(verification.result, verification.local);
+    constellationDetail.textContent = "Demo tamper applied. Select a point to inspect its chain link.";
+  } catch (error) {
+    chainStatus.textContent = error.message || "The Break Log demo could not run.";
+    chainStatus.className = "chain-status invalid";
+  } finally {
+    breakLogButton.disabled = false;
+    breakLogButton.textContent = "Break Log demo";
+  }
+}
+
+async function breakSavedRecord() {
+  if (API_ENDPOINTS.length) {
+    try {
+      const result = await requestFromApi("/audit-log/break-demo", { method: "POST" });
+      if (result.changed) return true;
+    } catch {
+      // Continue with the local demo when the optional backend is offline.
+    }
+  }
+
+  const entries = JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
+  if (!entries.length) return false;
+  entries[0].status = entries[0].status === "WARNING" ? "SAFE" : "WARNING";
+  localStorage.setItem(LOCAL_AUDIT_KEY, JSON.stringify(entries));
+  return true;
 }
 
 async function makeAuditHash(previousHash, auditId, statusValue, sequenceLengthValue, createdAt) {
@@ -381,7 +434,8 @@ function renderConstellation(hashes) {
     point.style.animationDelay = `${index * 35}ms`;
     point.setAttribute("aria-label", `Hash point ${index + 1}, code ${hash.slice(0, 10)}`);
     point.addEventListener("click", () => {
-      constellationDetail.textContent = `Point ${index + 1} · anonymous code ${hash.slice(0, 16)}… · chunk ${index + 1}`;
+      const linkLabel = chainState === "valid" ? "OK" : chainState === "invalid" ? "Broken" : "Not checked";
+      constellationDetail.innerHTML = `<strong>Chunk ${index + 1}</strong> · ${hash.length} character hash<br /><code>${hash}</code><br /><span class="link-state ${chainState}">Chain link: ${linkLabel}</span>`;
     });
     return point;
   });

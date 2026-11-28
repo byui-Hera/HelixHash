@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from uuid import uuid4
 
-from .database import find_matches, get_audit_log, initialize_database, save_audit, verify_audit_log
+from .database import break_audit_log_demo, find_matches, get_audit_log, initialize_database, save_audit, verify_audit_log
 
 app = FastAPI(title="HelixHash API")
 
@@ -72,3 +72,8 @@ def audit_log() -> list[dict]:
 @app.get("/audit-log/verify")
 def audit_log_verify() -> dict[str, object]:
     return verify_audit_log()
+
+
+@app.post("/audit-log/break-demo")
+def audit_log_break_demo() -> dict[str, object]:
+    return break_audit_log_demo()

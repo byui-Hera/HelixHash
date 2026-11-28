@@ -134,3 +134,19 @@ def verify_audit_log() -> dict[str, object]:
             return {"valid": False, "checked": len(entries), "broken_at": index}
         previous_hash = entry["entry_hash"]
     return {"valid": True, "checked": len(entries), "broken_at": None}
+
+
+def break_audit_log_demo() -> dict[str, object]:
+    """Alter one saved row without updating its hash for the teaching demo."""
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT audit_id, status FROM audit_log ORDER BY rowid LIMIT 1"
+        ).fetchone()
+        if not row:
+            return {"changed": False, "reason": "No audit records exist yet."}
+        replacement = "WARNING" if row["status"] != "WARNING" else "SAFE"
+        connection.execute(
+            "UPDATE audit_log SET status = ? WHERE audit_id = ?",
+            (replacement, row["audit_id"]),
+        )
+    return {"changed": True, "audit_id": row["audit_id"], "status": replacement}
