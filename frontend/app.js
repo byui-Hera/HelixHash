@@ -18,6 +18,7 @@ const statusDot = document.querySelector(".status-dot");
 const analysisDashboard = document.querySelector("#analysis-dashboard");
 const checkLogButton = document.querySelector("#check-log-button");
 const breakLogButton = document.querySelector("#break-log-button");
+const tamperRow = document.querySelector("#tamper-row");
 const chainStatus = document.querySelector("#chain-status");
 const sampleButton = document.querySelector("#sample-button");
 const resetButton = document.querySelector("#reset-button");
@@ -37,13 +38,14 @@ const API_ENDPOINTS = LOCAL_HOSTS.has(window.location.hostname)
       "http://localhost:8001/hashes",
     ]
   : [];
-const SAMPLE_FASTA = ">sample-sequence\nACGTACGTACGTACGTACGTACGTACGT\n>sample-sequence-2\nTACGATCGGCTAACGTATCGATGCCTA\n>sample-sequence-3\nGGCATATGCCGTAACCTTAGGCTAACG\n";
+const SAMPLE_FASTA = ">sample-sequence\nACGTACGTACGTACGTACGTACGTACGT\n>sample-sequence-2\nTACGATCGGCTAACGTATCGATGCCTA\n>sample-sequence-3\nGGCATATGCCGTAACCTTAGGCTAACG\n>sample-sequence-4\nCCGTAGGATACCTGGAATCGTACGGTTA\n";
 
 let selectedFile = null;
 let hasAnalysis = false;
 let analysisRun = 0;
 let currentHashes = [];
 let chainState = "unknown";
+let chainChecks = [];
 
 fileInput.addEventListener("change", () => {
   setSelectedFile(fileInput.files[0] ?? null);
@@ -94,8 +96,12 @@ function setSelectedFile(file) {
   }
 }
 
-function resetSession() {
+async function resetSession() {
+  if (API_ENDPOINTS.length) {
+    try { await requestFromApi("/audit-log/reset-demo", { method: "POST" }); } catch { /* backend is optional */ }
+  }
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LOCAL_AUDIT_KEY);
   selectedFile = null;
   hasAnalysis = false;
   analysisRun += 1;
@@ -114,6 +120,15 @@ function resetSession() {
   chainStatus.textContent = "Chain verification has not run.";
   chainStatus.className = "chain-status";
   setChainState("unknown");
+  chainChecks = [];
+  tamperRow.replaceChildren(new Option("1", "1"));
+  constellation.replaceChildren(Object.assign(document.createElement("span"), {
+    className: "constellation-empty",
+    textContent: "Load a FASTA file\nto reveal its shape",
+  }));
+  constellationCount.textContent = "0 POINTS";
+  constellationStatus.textContent = "Waiting for a local analysis.";
+  constellationDetail.textContent = "No readable DNA is used here.";
 }
 
 hashButton.addEventListener("click", () => {
@@ -311,17 +326,24 @@ function renderChainVerification(result, local) {
     : `${label} broken at entry ${result.broken_at}`;
   chainStatus.className = `chain-status ${result.valid ? "valid" : "invalid"}`;
   setChainState(result.valid ? "valid" : "invalid");
+  chainChecks = result.checks || [];
+  tamperRow.replaceChildren(...Array.from({ length: result.checked }, (_, index) => new Option(String(index + 1), String(index + 1))));
+  if (currentHashes.length) renderConstellation(currentHashes);
 }
 
 async function breakAuditLogDemo() {
   breakLogButton.disabled = true;
   breakLogButton.textContent = "Breaking…";
   try {
-    const changed = await breakSavedRecord();
+    const rowNumber = Number(tamperRow.value);
+    const changed = await breakSavedRecord(rowNumber);
     if (!changed) throw new Error("Run an analysis first so there is a saved record to test.");
-    const verification = await verifyAuditChain();
-    renderChainVerification(verification.result, verification.local);
-    constellationDetail.textContent = "Demo tamper applied. Select a point to inspect its chain link.";
+    // Tampering and verification are deliberately separate teaching actions.
+    setChainState("unknown");
+    if (currentHashes.length) renderConstellation(currentHashes);
+    chainStatus.textContent = `Row ${rowNumber} changed · click Check audit log to verify`;
+    chainStatus.className = "chain-status pending";
+    constellationDetail.textContent = `Demo tamper applied to row ${rowNumber}. Run Check audit log to recompute the chain.`;
   } catch (error) {
     chainStatus.textContent = error.message || "The Break Log demo could not run.";
     chainStatus.className = "chain-status invalid";
@@ -331,10 +353,14 @@ async function breakAuditLogDemo() {
   }
 }
 
-async function breakSavedRecord() {
+async function breakSavedRecord(rowNumber) {
   if (API_ENDPOINTS.length) {
     try {
-      const result = await requestFromApi("/audit-log/break-demo", { method: "POST" });
+      const result = await requestFromApi("/audit-log/break-demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ row: rowNumber }),
+      });
       if (result.changed) return true;
     } catch {
       // Continue with the local demo when the optional backend is offline.
@@ -343,7 +369,9 @@ async function breakSavedRecord() {
 
   const entries = JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
   if (!entries.length) return false;
-  entries[0].status = entries[0].status === "WARNING" ? "SAFE" : "WARNING";
+  const index = rowNumber - 1;
+  if (!entries[index]) return false;
+  entries[index].status = entries[index].status === "WARNING" ? "SAFE" : "WARNING";
   localStorage.setItem(LOCAL_AUDIT_KEY, JSON.stringify(entries));
   return true;
 }
@@ -369,15 +397,18 @@ async function saveLocalAuditEntry(statusValue, sequenceLengthValue) {
 async function verifyLocalAuditLog() {
   const entries = JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
   let previousHash = "GENESIS";
+  const checks = [];
+  let firstBroken = null;
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
     const expectedHash = await makeAuditHash(previousHash, entry.audit_id, entry.status, entry.sequence_length, entry.created_at);
-    if (entry.previous_hash !== previousHash || entry.entry_hash !== expectedHash) {
-      return { valid: false, checked: entries.length, broken_at: index + 1 };
-    }
-    previousHash = entry.entry_hash;
+    const linkValid = entry.previous_hash === previousHash;
+    const hashValid = entry.entry_hash === expectedHash;
+    checks.push({ row: index + 1, valid: linkValid && hashValid, link_valid: linkValid, hash_valid: hashValid });
+    if (!linkValid || !hashValid) firstBroken = firstBroken || index + 1;
+    previousHash = expectedHash;
   }
-  return { valid: true, checked: entries.length, broken_at: null };
+  return { valid: firstBroken === null, checked: entries.length, broken_at: firstBroken, checks };
 }
 
 function splitIntoChunks(sequence, size) { // divides DNA into 100-base sections
@@ -427,6 +458,7 @@ function renderConstellation(hashes) {
     const point = document.createElement("button");
     point.type = "button";
     point.className = "constellation-point";
+    point.classList.add(chainState);
     point.style.left = `${x}%`;
     point.style.top = `${y}%`;
     point.style.width = `${size}px`;

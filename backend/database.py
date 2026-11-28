@@ -123,30 +123,61 @@ def get_audit_log() -> list[dict]:
 
 
 def verify_audit_log() -> dict[str, object]:
-    entries = list(reversed(get_audit_log()))
+    with get_connection() as connection:
+        entries = [
+            dict(row) for row in connection.execute(
+                "SELECT audit_id, status, matched_chunks, off_targets, created_at, previous_hash, entry_hash "
+                "FROM audit_log ORDER BY rowid"
+            ).fetchall()
+        ]
     previous_hash = "GENESIS"
+    checks = []
+    first_broken = None
     for index, entry in enumerate(entries, start=1):
         expected_hash = make_entry_hash(
             previous_hash, entry["audit_id"], entry["status"], entry["matched_chunks"],
             entry["off_targets"], entry["created_at"]
         )
-        if entry["previous_hash"] != previous_hash or entry["entry_hash"] != expected_hash:
-            return {"valid": False, "checked": len(entries), "broken_at": index}
-        previous_hash = entry["entry_hash"]
-    return {"valid": True, "checked": len(entries), "broken_at": None}
+        link_ok = entry["previous_hash"] == previous_hash
+        hash_ok = entry["entry_hash"] == expected_hash
+        checks.append({
+            "row": index,
+            "audit_id": entry["audit_id"],
+            "valid": link_ok and hash_ok,
+            "link_valid": link_ok,
+            "hash_valid": hash_ok,
+        })
+        if not link_ok or not hash_ok:
+            first_broken = first_broken or index
+        # Propagate the recomputed hash so an early edit breaks downstream links too.
+        previous_hash = expected_hash
+    return {
+        "valid": first_broken is None,
+        "checked": len(entries),
+        "broken_at": first_broken,
+        "checks": checks,
+    }
 
 
-def break_audit_log_demo() -> dict[str, object]:
+def break_audit_log_demo(row_number: int = 1) -> dict[str, object]:
     """Alter one saved row without updating its hash for the teaching demo."""
     with get_connection() as connection:
         row = connection.execute(
-            "SELECT audit_id, status FROM audit_log ORDER BY rowid LIMIT 1"
+            "SELECT audit_id, status FROM audit_log ORDER BY rowid LIMIT 1 OFFSET ?",
+            (row_number - 1,),
         ).fetchone()
         if not row:
-            return {"changed": False, "reason": "No audit records exist yet."}
+            return {"changed": False, "reason": f"Audit row {row_number} does not exist."}
         replacement = "WARNING" if row["status"] != "WARNING" else "SAFE"
         connection.execute(
             "UPDATE audit_log SET status = ? WHERE audit_id = ?",
             (replacement, row["audit_id"]),
         )
-    return {"changed": True, "audit_id": row["audit_id"], "status": replacement}
+    return {"changed": True, "row": row_number, "audit_id": row["audit_id"], "status": replacement}
+
+
+def reset_audit_log_demo() -> dict[str, object]:
+    """Clear only the audit rows created by the local learning demo."""
+    with get_connection() as connection:
+        result = connection.execute("DELETE FROM audit_log")
+    return {"reset": True, "removed": result.rowcount}

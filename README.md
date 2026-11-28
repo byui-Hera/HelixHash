@@ -35,6 +35,17 @@ Think of the log as dominoes: changing an older record breaks the link to the ne
 
 Python's built-in `hashlib.sha256` creates the stamps, which are stored in the SQLite `audit_log` table. Legacy rows without chain fields are backfilled once; existing stamped rows are not silently repaired during startup.
 
+## Tamper & Verify demo mode
+
+After at least one analysis, `Break Log demo` only alters the selected early, middle, or late row; it does not verify the result. `Check audit log` is a separate action that recomputes every row from oldest to newest. The next verification reports the first broken row; the constellation turns green for an intact chain and red when the audit chain is broken. `Reset Session` clears the browser chain and the local demo audit table so you can repeat the exercise.
+
+The important distinction is that a changed row fails its own recomputed hash, while changing an earlier row also causes later links to fail when the verifier propagates the recomputed hash forward. The verifier checks both conditions for each row:
+
+```text
+previous_hash == hash saved by the preceding row
+entry_hash == SHA-256(previous_hash + current audit fields)
+```
+
 ## Run locally
 
 From the `frontend/` folder, start the website:

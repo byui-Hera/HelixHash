@@ -3,7 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from uuid import uuid4
 
-from .database import break_audit_log_demo, find_matches, get_audit_log, initialize_database, save_audit, verify_audit_log
+from .database import (
+    break_audit_log_demo,
+    find_matches,
+    get_audit_log,
+    initialize_database,
+    reset_audit_log_demo,
+    save_audit,
+    verify_audit_log,
+)
 
 app = FastAPI(title="HelixHash API")
 
@@ -22,6 +30,10 @@ app.add_middleware(
 
 class HashRequest(BaseModel):
     hashes: list[str]
+
+
+class TamperRequest(BaseModel):
+    row: int = 1
 
 
 # Learning-only placeholder. Never use this as a real medical risk database.
@@ -75,5 +87,13 @@ def audit_log_verify() -> dict[str, object]:
 
 
 @app.post("/audit-log/break-demo")
-def audit_log_break_demo() -> dict[str, object]:
-    return break_audit_log_demo()
+def audit_log_break_demo(request: TamperRequest | None = None) -> dict[str, object]:
+    row = request.row if request else 1
+    if row < 1:
+        return {"changed": False, "reason": "row must be 1 or greater."}
+    return break_audit_log_demo(row)
+
+
+@app.post("/audit-log/reset-demo")
+def audit_log_reset_demo() -> dict[str, object]:
+    return reset_audit_log_demo()

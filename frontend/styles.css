@@ -91,6 +91,10 @@ button:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
   .privacy-strip { margin-bottom: 2rem; padding: 1rem; }
   footer { padding-bottom: 1.5rem; }
 }
+.row-picker { display: inline-flex; align-items: center; gap: .35rem; color: var(--muted); font: 500 .65rem "DM Mono", monospace; }
+.row-picker select { padding: .55rem .35rem; border: 1px solid var(--line); border-radius: 7px; color: var(--teal-dark); background: white; font: inherit; }
+.constellation-point.valid { border-color: #dff7a2; background: #65c9b2; }
+.constellation-point.invalid { border-color: #ffb08d; background: #db625f; box-shadow: 0 0 0 4px #ff9d7a33, 0 0 18px #ff8b72; }
 @media (min-width: 761px) and (max-width: 1050px) {
   .shell { width: min(100% - 40px, 920px); }
   .hero { padding-inline: 2%; }
